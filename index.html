@@ -3,421 +3,245 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>All-In-One Business Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <title>POS PRO - Secure Edition</title>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
+        :root { --mlbb: #8e44ad; --transfer: #27ae60; --dark: #1e272e; --bg: #f4f6f9; --primary: #3f51b5; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); padding: 10px; margin: 0; }
+        .container { max-width: 500px; margin: auto; }
         
-        body { font-family: 'Poppins', 'Segoe UI', sans-serif; background-color: #0f172a; color: #e2e8f0; }
+        /* Dashboard Styling */
+        .owner-section { background: var(--dark); color: white; padding: 20px; border-radius: 20px; margin-bottom: 15px; display: none; }
+        .total-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 15px; }
+        .mini-card { background: rgba(255,255,255,0.1); padding: 10px; border-radius: 10px; text-align: center; font-size: 11px; }
         
-        /* Tab Styling */
-        .tab-btn { border-bottom: 4px solid transparent; transition: all 0.3s; }
-        .active-tab { border-bottom: 4px solid #00ffff; color: #00ffff !important; background: rgba(0, 255, 255, 0.1); }
+        /* Status Buttons inside Dashboard */
+        .status-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; }
+        .status-btn { padding: 10px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; color: white; }
+
+        /* Form Card */
+        .card { background: white; padding: 20px; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 20px; position: relative; }
+        .lock-overlay { display: none; background: rgba(255,255,255,0.95); position: absolute; top:0; left:0; width:100%; height:100%; z-index: 10; border-radius: 20px; align-items: center; justify-content: center; flex-direction: column; }
         
-        /* Style from Eg 4.html */
-        .neon-blue { background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%); box-shadow: 0 0 15px rgba(0, 210, 255, 0.4); }
-        .wave-yellow { background: linear-gradient(135deg, #f7971e 0%, #ffd200 100%); box-shadow: 0 0 15px rgba(247, 151, 30, 0.4); }
-        
-        /* Style from index.html (Diamond Cards) */
-        .price-card {
-            background: linear-gradient(145deg, #1e2a3a, #0f1a2f);
-            border: 1px solid #ffd700;
-            border-radius: 18px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .price-card:hover { transform: translateY(-5px); box-shadow: 0 0 15px #00ffff; border-color: #00ffff; }
-        .price-card.selected { border: 2px solid #00ffff; background: rgba(0, 255, 255, 0.1); box-shadow: 0 0 20px #00ffff; }
-        
-        /* Utilities */
-        ::-webkit-scrollbar { width: 5px; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        label { font-size: 11px; font-weight: bold; color: var(--primary); margin-left: 5px; }
+        select, input { width: 100%; padding: 12px; margin: 5px 0 12px 0; border-radius: 10px; border: 1px solid #ddd; box-sizing: border-box; font-size: 14px; }
+        .main-btn { width: 100%; padding: 15px; background: var(--primary); color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; }
+
+        /* List UI */
+        .list-item { background: white; padding: 15px; border-radius: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border-left: 5px solid var(--primary); }
+        .item-info b { font-size: 14px; color: #111; display: block; }
+        .item-info small { color: #888; font-size: 11px; }
+        .price-info { text-align: right; flex-grow: 1; margin-right: 15px; }
+        .sale-amt { font-weight: bold; font-size: 15px; color: #111; }
+        .profit-amt { font-size: 12px; font-weight: bold; color: #27ae60; margin-top: 2px; }
+        .del-btn { color: #ff4757; cursor: pointer; background: none; border: none; }
         .hidden { display: none; }
     </style>
 </head>
-<body class="min-h-screen pb-10">
+<body>
 
-    <nav class="bg-slate-900 border-b border-slate-700 sticky top-0 z-50 shadow-2xl">
-        <div class="max-w-6xl mx-auto flex justify-around">
-            <button onclick="switchTab('money')" id="tab-money" class="tab-btn flex-1 py-5 font-bold text-gray-400 uppercase tracking-widest flex items-center justify-center gap-2">
-                💵 Money Transfer
-            </button>
-            <button onclick="switchTab('diamond')" id="tab-diamond" class="tab-btn flex-1 py-5 font-bold text-gray-400 uppercase tracking-widest flex items-center justify-center gap-2">
-                💎 MLBB Diamond
-            </button>
+<div class="container">
+    <button onclick="toggleOwnerDashboard()" style="width:100%; padding:10px; border-radius:10px; border:1px dashed var(--primary); background:none; color:var(--primary); font-weight:bold; margin-bottom:15px;">Admin Dashboard</button>
+
+    <div id="ownerPanel" class="owner-section">
+        <div style="display:flex; justify-content: space-between; align-items:center;">
+            <h3 style="margin:0;">Insights</h3>
+            <input type="date" id="viewDate" onchange="loadSales()" style="width:auto; padding:5px; border-radius:5px;">
         </div>
-    </nav>
-
-    <div class="max-w-6xl mx-auto p-4 mt-4">
-
-        <div id="section-money" class="tab-content">
-            <h1 class="text-3xl font-bold text-center mb-6 text-cyan-400">Financial Record Dashboard</h1>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div class="bg-slate-800 p-5 rounded-2xl border border-cyan-500/30 text-center">
-                    <p class="text-gray-400 text-sm mb-1 uppercase tracking-wider">Today's Total Service Fee</p>
-                    <h2 id="moneyDailyTotal" class="text-4xl font-black text-green-400">0 <span class="text-sm font-normal text-gray-300">Ks</span></h2>
-                </div>
-                <div class="bg-slate-800 p-5 rounded-2xl border border-purple-500/30">
-                    <p class="text-gray-400 text-sm mb-2 text-center font-bold uppercase">Daily History (12 AM Reset)</p>
-                    <div id="moneyHistoryLogs" class="text-sm text-purple-300 max-h-[80px] overflow-y-auto px-2 space-y-1">မှတ်တမ်းမရှိသေးပါ။</div>
-                </div>
-            </div>
-
-            <div class="flex gap-4 mb-6">
-                <button onclick="switchMoneyService('KPay')" id="btnKPay" class="flex-1 py-4 rounded-2xl font-black neon-blue border-2 border-cyan-300">K PAY</button>
-                <button onclick="switchMoneyService('WavePay')" id="btnWave" class="flex-1 py-4 rounded-2xl font-black bg-gray-700 opacity-60">WAVE PAY</button>
-            </div>
-
-            <div class="bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-2xl mb-8">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div>
-                        <label class="block text-xs text-gray-400 mb-2 uppercase">Customer Name</label>
-                        <input type="text" id="moneyCustName" class="w-full bg-slate-900 p-4 rounded-xl border border-slate-700 focus:outline-none focus:border-cyan-400" placeholder="အမည်ရိုက်ထည့်ပါ">
-                    </div>
-                    <div>
-                        <label class="block text-xs text-gray-400 mb-2 uppercase">Type (လွှဲ/ထုတ်)</label>
-                        <select id="moneyTransType" onchange="autoCalcMoney()" class="w-full bg-slate-900 p-4 rounded-xl border border-slate-700 focus:outline-none">
-                            <option value="Transfer">ငွေလွှဲ (Transfer)</option>
-                            <option value="Withdraw">ငွေထုတ် (Withdraw)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs text-gray-400 mb-2 uppercase">Amount (ကျပ်)</label>
-                        <input type="number" id="moneyAmount" oninput="autoCalcMoney()" class="w-full bg-slate-900 p-4 rounded-xl border border-slate-700 text-yellow-500 font-bold text-xl outline-none" placeholder="0.00">
-                    </div>
-                    <div>
-                        <label class="block text-xs text-gray-400 mb-2 uppercase font-bold">Service Fee</label>
-                        <input type="text" id="moneyServiceFee" class="w-full bg-slate-950 p-4 rounded-xl border border-slate-800 text-green-400 font-black text-xl" readonly value="0">
-                    </div>
-                </div>
-                <button onclick="saveMoneyRecord()" id="moneySaveBtn" class="w-full mt-8 py-4 rounded-2xl font-black neon-blue uppercase tracking-widest text-lg">စာရင်းသွင်းမည်</button>
-            </div>
-
-            <input type="text" id="moneySearch" oninput="renderMoneyTable()" class="w-full bg-slate-800 p-4 rounded-2xl border border-slate-700 mb-4 outline-none focus:border-cyan-400" placeholder="🔍 နာမည် သို့မဟုတ် ရက်စွဲဖြင့် ရှာရန်...">
-            
-            <div class="overflow-x-auto bg-slate-800 rounded-3xl border border-slate-700 shadow-2xl">
-                <table class="w-full text-left">
-                    <thead class="bg-slate-900/50">
-                        <tr>
-                            <th class="p-5 text-xs uppercase text-slate-500 font-bold">Date & Time</th>
-                            <th class="p-5 text-xs uppercase text-slate-500 font-bold">Customer</th>
-                            <th class="p-5 text-xs uppercase text-slate-500 font-bold">Service</th>
-                            <th class="p-5 text-xs uppercase text-slate-500 font-bold text-right">Amount</th>
-                            <th class="p-5 text-xs uppercase text-slate-500 font-bold text-right text-green-400">Fee</th>
-                            <th class="p-5 text-xs uppercase text-slate-500 font-bold text-center">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="moneyRecordList"></tbody>
-                </table>
-            </div>
+        
+        <div style="text-align:center; margin:15px 0;">
+            <small style="opacity:0.7">NET PROFIT (ALL)</small>
+            <h1 id="allProfit" style="margin:0; color:#2ecc71;">0 K</h1>
         </div>
 
-        <div id="section-diamond" class="tab-content hidden">
-            <div class="bg-slate-900/50 p-6 rounded-3xl border border-yellow-500 shadow-lg mb-8 text-center">
-                <h1 class="text-2xl font-black text-yellow-500 uppercase tracking-widest">💎 Mobile Legend Diamond Sale Pro</h1>
-            </div>
-
-            <div class="bg-slate-800 p-6 rounded-3xl border border-cyan-500/30 mb-8 flex flex-wrap items-center justify-between gap-4">
-                <label class="text-yellow-500 font-bold uppercase tracking-wider flex items-center gap-2">💰 SMILE COIN MARKET RATE</label>
-                <div class="bg-slate-950 px-6 py-3 rounded-full border border-yellow-500 flex items-center gap-3">
-                    <span class="text-cyan-400 font-bold">1 SC =</span>
-                    <input type="number" id="scRate" step="0.1" value="75.5" class="bg-transparent text-yellow-500 font-bold text-xl w-20 text-center outline-none">
-                    <span class="text-gray-400">ကျပ်</span>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-8" id="diaPriceGrid"></div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                <div class="lg:col-span-2 bg-slate-800 p-8 rounded-3xl border border-slate-700 shadow-xl">
-                    <div id="diaPkgLabel" class="bg-slate-900 p-4 rounded-xl border-l-4 border-yellow-500 text-cyan-400 font-bold mb-6">👆 Package ကို အပေါ်မှ ရွေးချယ်ပါ</div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <input type="date" id="diaSaleDate" class="bg-slate-900 p-4 rounded-xl border border-slate-700 outline-none">
-                        <input type="text" id="diaCustName" class="bg-slate-900 p-4 rounded-xl border border-slate-700 outline-none" placeholder="👤 Customer နာမည်">
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                        <input type="number" id="diaBuyPrice" class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-yellow-500 font-bold" readonly placeholder="ဝယ်ရင်းဈေး">
-                        <input type="number" id="diaSellPrice" class="bg-slate-900 p-4 rounded-xl border border-slate-700 text-green-400 font-bold outline-none" placeholder="💰 ရောင်းဈေး (ကျပ်)">
-                    </div>
-                    <input type="hidden" id="selectedPkgName">
-                    <button onclick="saveDiaRecord()" class="w-full py-4 rounded-2xl font-black bg-gradient-to-r from-yellow-500 to-orange-500 text-slate-900 uppercase tracking-widest shadow-lg hover:scale-[1.01] transition-all">💾 စာရင်းမှတ်တမ်း သိမ်းမည်</button>
-                    <button onclick="exportDiaToExcel()" class="w-full mt-4 py-3 border border-cyan-400 text-cyan-400 rounded-xl font-bold uppercase text-sm hover:bg-cyan-400/10">📥 EXCEL REPORT ထုတ်ယူမည်</button>
-                </div>
-
-                <div class="space-y-4">
-                    <div class="bg-slate-800 p-6 rounded-3xl border border-green-500/30 text-center">
-                        <p class="text-gray-400 text-xs uppercase mb-1">Today Profit</p>
-                        <h2 id="diaDailyProfit" class="text-3xl font-black text-green-400">0 Ks</h2>
-                    </div>
-                    <div class="bg-slate-800 p-6 rounded-3xl border border-cyan-500/30 text-center">
-                        <p class="text-gray-400 text-xs uppercase mb-1">Today Sales</p>
-                        <h2 id="diaDailySell" class="text-3xl font-black text-cyan-400">0 Ks</h2>
-                    </div>
-                    <div class="bg-slate-800 p-6 rounded-3xl border border-yellow-500/30 text-center">
-                        <p class="text-gray-400 text-xs uppercase mb-1">Overall Profit</p>
-                        <h2 id="diaOverallProfit" class="text-3xl font-black text-yellow-500">0 Ks</h2>
-                    </div>
-                </div>
-            </div>
-
-            <input type="text" id="diaSearch" oninput="renderDiaTable()" class="w-full bg-slate-800 p-4 rounded-2xl border border-slate-700 mb-4 outline-none focus:border-yellow-500" placeholder="🔍 ရှာဖွေရန် (နာမည် သို့မဟုတ် ရက်စွဲ)...">
-
-            <div class="overflow-x-auto bg-slate-800 rounded-3xl border border-slate-700 shadow-2xl">
-                <table class="w-full text-left">
-                    <thead class="bg-slate-900">
-                        <tr>
-                            <th class="p-4 text-xs text-slate-500 uppercase">နေ့စွဲ</th>
-                            <th class="p-4 text-xs text-slate-500 uppercase">Customer</th>
-                            <th class="p-4 text-xs text-slate-500 uppercase">Package</th>
-                            <th class="p-4 text-xs text-slate-500 uppercase text-right">အမြတ်</th>
-                            <th class="p-4 text-xs text-slate-500 uppercase text-center">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="diaTableBody"></tbody>
-                </table>
-            </div>
+        <div class="total-grid">
+            <div class="mini-card"><small>SALES</small><b id="totalSale">0</b></div>
+            <div class="mini-card"><small>DIA PROFIT</small><b id="mlbbProfitDisp">0</b></div>
+            <div class="mini-card" style="background:var(--transfer)"><small>MONEY PROFIT</small><b id="moneyProfitDisp">0</b></div>
         </div>
 
+        <div class="status-controls">
+            <button onclick="setLock(true)" class="status-btn" style="background:#ff4757;">🔴 စာရင်းပိတ်</button>
+            <button onclick="setLock(false)" class="status-btn" style="background:#2e86de;">🔵 စာရင်းဖွင့်</button>
+        </div>
+        
+        <button onclick="copySummary()" style="width:100%; margin-top:15px; background:rgba(255,255,255,0.1); color:white; border:none; padding:12px; border-radius:10px; font-weight:bold;">Copy Detailed Summary</button>
     </div>
 
-    <script>
-        // ================== TAB NAVIGATION ==================
-        function switchTab(tab) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active-tab'));
-            
-            document.getElementById(`section-${tab}`).classList.remove('hidden');
-            document.getElementById(`tab-${tab}`).classList.add('active-tab');
+    <div class="card" id="formArea">
+        <div id="lockOverlay" class="lock-overlay">
+            <span class="material-icons" style="font-size:45px; color:#ff4757;">lock</span>
+            <p style="font-weight:bold; color:#333;">စာရင်းပိတ်ထားပါသည်</p>
+        </div>
+        
+        <div style="display:flex; gap:10px;">
+            <div style="flex:1;"><label>SC RATE</label><input type="number" id="scRate" value="115" oninput="updateCost()"></div>
+            <div style="flex:1;"><label>CATEGORY</label>
+                <select id="mainType" onchange="toggleFields()">
+                    <option value="MLBB">💎 MLBB</option>
+                    <option value="Transfer">💸 Money</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="mlbbGroup">
+            <label>DIAMOND PACK</label>
+            <select id="diaPack" onchange="updateCost()">
+                <option value="0" data-sc="0">-- Pack --</option>
+                <optgroup label="2X Diamonds">
+                    <option value="50+50 Dia" data-sc="39">50+50 Dia</option>
+                    <option value="150+150 Dia" data-sc="116.9">150+150 Dia</option>
+                    <option value="250+250 Dia" data-sc="187.5">250+250 Dia</option>
+                    <option value="500+500 Dia" data-sc="385">500+500 Dia</option>
+                </optgroup>
+                <optgroup label="Normal Diamonds">
+                    <option value="86 Dia" data-sc="61.5">86 Dia</option>
+                    <option value="172 Dia" data-sc="122">172 Dia</option>
+                    <option value="257 Dia" data-sc="177.5">257 Dia</option>
+                    <option value="343 Dia" data-sc="239">343 Dia</option>
+                    <option value="429 Dia" data-sc="299.5">429 Dia</option>
+                    <option value="514 Dia" data-sc="355">514 Dia</option>
+                    <option value="600 Dia" data-sc="416.5">600 Dia</option>
+                    <option value="706 Dia" data-sc="480">706 Dia</option>
+                    <option value="878 Dia" data-sc="602">878 Dia</option>
+                    <option value="1050 Dia" data-sc="724">1050 Dia</option>
+                    <option value="2195 Dia" data-sc="1453">2195 Dia</option>
+                    <option value="3688 Dia" data-sc="2424">3688 Dia</option>
+                    <option value="5532 Dia" data-sc="3660">5532 Dia</option>
+                    <option value="9288 Dia" data-sc="6079">9288 Dia</option>
+                </optgroup>
+                <optgroup label="Passes">
+                    <option value="Weekly Pass" data-sc="76">Weekly Diamond Pass</option>
+                    <option value="Twilight Pass" data-sc="402.5">Twilight Pass</option>
+                </optgroup>
+            </select>
+            <label>PLAYER NAME / ID</label>
+            <input type="text" id="playerId" placeholder="Customer name">
+        </div>
+
+        <div id="transferGroup" class="hidden">
+            <label>BANK / WALLET</label>
+            <select id="bankName">
+                <option value="KPay">KPay</option><option value="WavePay">WavePay</option>
+                <option value="KBZ Bank">KBZ Bank</option><option value="CB Bank/Pay">CB Bank/Pay</option>
+                <option value="AYA Bank/Pay">AYA Bank/Pay</option><option value="Yoma Bank">Yoma Bank</option>
+                <option value="uabpay">uabpay</option><option value="OK$">OK$</option><option value="Mytel Pay">Mytel Pay</option>
+            </select>
+            <label>ACTION</label>
+            <select id="transferAction"><option value="လွှဲ">လွှဲ (Out)</option><option value="ထုတ်">ထုတ် (In)</option></select>
+        </div>
+
+        <div style="display:flex; gap:10px;">
+            <div style="flex:1;"><label>အရင်း</label><input type="number" id="cost" placeholder="0"></div>
+            <div style="flex:1;"><label>ရောင်းဈေး</label><input type="number" id="sale" placeholder="0"></div>
+        </div>
+        <button onclick="saveData()" class="main-btn">SAVE TRANSACTION</button>
+    </div>
+
+    <span style="font-size:16px; font-weight:bold; margin:15px 5px; display:block;">ယနေ့မှတ်တမ်း</span>
+    <div id="salesList"></div>
+</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyAnpm1rcRiJKz1cHfzEEwyrHpeLDMu-pIw",
+        authDomain: "new-pos-system-cd358.firebaseapp.com",
+        projectId: "new-pos-system-cd358",
+        storageBucket: "new-pos-system-cd358.firebasestorage.app",
+        messagingSenderId: "850496462463",
+        appId: "1:850496462463:web:dce467c5ae49792b3d694a"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const OWNER_PIN = "515705";
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    document.getElementById('viewDate').value = todayStr;
+
+    function toggleFields() {
+        const isMLBB = document.getElementById('mainType').value === 'MLBB';
+        document.getElementById('mlbbGroup').classList.toggle('hidden', !isMLBB);
+        document.getElementById('transferGroup').classList.toggle('hidden', isMLBB);
+        updateCost();
+    }
+
+    function updateCost() {
+        if(document.getElementById('mainType').value === 'MLBB') {
+            const sc = parseFloat(document.getElementById('diaPack').selectedOptions[0].getAttribute('data-sc')) || 0;
+            document.getElementById('cost').value = Math.round(sc * parseFloat(document.getElementById('scRate').value));
         }
+    }
 
-        // ================== MONEY RECORD SYSTEM (Eg 4.html logic) ==================
-        let moneyService = 'KPay';
-        let moneyRecords = JSON.parse(localStorage.getItem('moneyRecords')) || [];
-        let moneyDailyHistory = JSON.parse(localStorage.getItem('moneyDailyHistory')) || {};
+    async function saveData() {
+        const sale = parseFloat(document.getElementById('sale').value) || 0;
+        const cost = parseFloat(document.getElementById('cost').value) || 0;
+        const type = document.getElementById('mainType').value;
+        const uName = document.getElementById('playerId').value || "";
+        const desc = (type === 'MLBB') ? document.getElementById('diaPack').value : document.getElementById('bankName').value + " " + document.getElementById('transferAction').value;
+        if(sale === 0) return alert("ဈေးနှုန်းထည့်ပါ");
+        await db.collection("sales").add({
+            description: desc, userName: uName, cost, salePrice: sale, profit: sale - cost,
+            type: type, dateKey: todayStr, timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        document.getElementById('sale').value = ""; document.getElementById('playerId').value = "";
+    }
 
-        function switchMoneyService(service) {
-            moneyService = service;
-            const btnK = document.getElementById('btnKPay');
-            const btnW = document.getElementById('btnWave');
-            const saveBtn = document.getElementById('moneySaveBtn');
+    let reportData = {}; 
 
-            if (service === 'KPay') {
-                btnK.className = "flex-1 py-4 rounded-2xl font-black neon-blue border-2 border-cyan-300 transition-all";
-                btnW.className = "flex-1 py-4 rounded-2xl font-black bg-gray-700 opacity-60";
-                saveBtn.className = "w-full mt-8 py-4 rounded-2xl font-black neon-blue transition-all";
-            } else {
-                btnW.className = "flex-1 py-4 rounded-2xl font-black wave-yellow border-2 border-yellow-300 transition-all";
-                btnK.className = "flex-1 py-4 rounded-2xl font-black bg-gray-700 opacity-60";
-                saveBtn.className = "w-full mt-8 py-4 rounded-2xl font-black wave-yellow transition-all";
-            }
-            autoCalcMoney();
-        }
-
-        function autoCalcMoney() {
-            const amount = parseInt(document.getElementById('moneyAmount').value) || 0;
-            let fee = 0;
-            if (amount >= 5000 && amount <= 60000) {
-                fee = Math.floor(amount / 10000) * 100;
-                if (fee === 0) fee = 100;
-            } else if (amount >= 70000 && amount <= 100000) fee = 700;
-            else if (amount >= 200000 && amount <= 300000) fee = 2000;
-            else if (amount >= 400000 && amount <= 500000) fee = 3500;
-            else if (amount >= 600000 && amount <= 700000) fee = 5000;
-            else if (amount >= 800000 && amount <= 900000) fee = 7000;
-            else if (amount >= 1000000) fee = 9000;
-            document.getElementById('moneyServiceFee').value = fee;
-        }
-
-        function saveMoneyRecord() {
-            const name = document.getElementById('moneyCustName').value;
-            const amount = document.getElementById('moneyAmount').value;
-            const fee = document.getElementById('moneyServiceFee').value;
-            const type = document.getElementById('moneyTransType').value;
-            if (!name || !amount) return alert("အချက်အလက်ပြည့်စုံစွာ ဖြည့်ပါ");
-
-            const now = new Date();
-            const rec = { 
-                id: Date.now(), 
-                name, amount, fee, service: moneyService, type,
-                fullTime: now.toLocaleString(),
-                dateStr: now.toLocaleDateString()
-            };
-            moneyRecords.unshift(rec);
-            localStorage.setItem('moneyRecords', JSON.stringify(moneyRecords));
-            document.getElementById('moneyCustName').value = '';
-            document.getElementById('moneyAmount').value = '';
-            renderMoneyTable();
-        }
-
-        function deleteMoney(id) {
-            if(confirm('ဖျက်ရန် သေချာပါသလား?')) {
-                moneyRecords = moneyRecords.filter(r => r.id !== id);
-                localStorage.setItem('moneyRecords', JSON.stringify(moneyRecords));
-                renderMoneyTable();
-            }
-        }
-
-        function renderMoneyTable() {
-            const list = document.getElementById('moneyRecordList');
-            const search = document.getElementById('moneySearch').value.toLowerCase();
-            const today = new Date().toLocaleDateString();
-            let totalFee = 0;
-            list.innerHTML = '';
-
-            moneyRecords.forEach(r => {
-                if (r.dateStr === today) totalFee += parseInt(r.fee);
-                if (r.name.toLowerCase().includes(search) || r.fullTime.toLowerCase().includes(search)) {
-                    list.innerHTML += `
-                        <tr class="border-b border-slate-700/50 hover:bg-slate-700/30">
-                            <td class="p-5 text-sm text-gray-400">${r.fullTime}</td>
-                            <td class="p-5 font-bold text-slate-200">${r.name}</td>
-                            <td class="p-5">
-                                <span class="px-3 py-1 rounded-full text-[10px] uppercase font-black ${r.service === 'KPay' ? 'bg-cyan-900/40 text-cyan-400 border border-cyan-700' : 'bg-yellow-900/40 text-yellow-500 border border-yellow-700'}">
-                                    ${r.service} | ${r.type}
-                                </span>
-                            </td>
-                            <td class="p-5 text-right font-mono">${parseInt(r.amount).toLocaleString()}</td>
-                            <td class="p-5 text-right text-green-400 font-bold">${parseInt(r.fee).toLocaleString()}</td>
-                            <td class="p-5 text-center"><button onclick="deleteMoney(${r.id})" class="text-red-500 font-bold">✕</button></td>
-                        </tr>`;
-                }
+    function loadSales() {
+        const sDate = document.getElementById('viewDate').value;
+        db.collection("sales").where("dateKey", "==", sDate).onSnapshot(snap => {
+            let stats = { mlbbCnt: 0, mlbbProf: 0, moneyCnt: 0, moneyProf: 0, totalSale: 0 };
+            let html = "";
+            snap.forEach(doc => {
+                const d = doc.data();
+                stats.totalSale += d.salePrice;
+                if(d.type === 'MLBB') { stats.mlbbCnt++; stats.mlbbProf += d.profit; }
+                else { stats.moneyCnt++; stats.moneyProf += d.profit; }
+                
+                html += `
+                <div class="list-item">
+                    <div class="item-info">
+                        <b>${d.description} ${d.userName ? '('+d.userName+')' : ''}</b>
+                        <small>${d.timestamp ? d.timestamp.toDate().toLocaleTimeString() : 'Saving...'}</small>
+                    </div>
+                    <div class="price-info">
+                        <span class="sale-amt">${d.salePrice.toLocaleString()} K</span>
+                        <div class="profit-amt">+${d.profit.toLocaleString()} K</div>
+                    </div>
+                    <button class="del-btn" onclick="deleteRec('${doc.id}')"><span class="material-icons">delete</span></button>
+                </div>`;
             });
-            document.getElementById('moneyDailyTotal').innerText = totalFee.toLocaleString();
-            renderMoneyHistory();
-        }
+            reportData = { ...stats, date: sDate };
+            document.getElementById('allProfit').innerText = (stats.mlbbProf + stats.moneyProf).toLocaleString() + " K";
+            document.getElementById('totalSale').innerText = stats.totalSale.toLocaleString();
+            document.getElementById('mlbbProfitDisp').innerText = stats.mlbbProf.toLocaleString();
+            document.getElementById('moneyProfitDisp').innerText = stats.moneyProf.toLocaleString();
+            document.getElementById('salesList').innerHTML = html;
+        });
+    }
 
-        function renderMoneyHistory() {
-            const hBox = document.getElementById('moneyHistoryLogs');
-            const keys = Object.keys(moneyDailyHistory).sort().reverse();
-            if(keys.length) {
-                hBox.innerHTML = keys.map(k => `<div class="flex justify-between py-1 border-b border-slate-700"><span>${k}</span><b class="text-purple-400">${moneyDailyHistory[k].toLocaleString()} Ks</b></div>`).join('');
-            }
-        }
+    function copySummary() {
+        const totalProfit = reportData.mlbbProf + reportData.moneyProf;
+        const text = `📊 Report (${reportData.date})\n\n💎 Diamonds: ${reportData.mlbbCnt} ကြောင်း\n Profit: ${reportData.mlbbProf.toLocaleString()} K\n\n💸 Money: ${reportData.moneyCnt} ကြောင်း\n Profit: ${reportData.moneyProf.toLocaleString()} K\n\n💰 Total Sale: ${reportData.totalSale.toLocaleString()} K\n💰 Net Profit: ${totalProfit.toLocaleString()} K`;
+        navigator.clipboard.writeText(text);
+        alert("စာရင်းချုပ် Copy ကူးပြီးပါပြီ");
+    }
 
-        function checkMoneyReset() {
-            const today = new Date().toLocaleDateString();
-            const last = localStorage.getItem('moneyLastUpdate');
-            if (last && last !== today) {
-                let yTotal = 0;
-                moneyRecords.forEach(r => { if(r.dateStr === last) yTotal += parseInt(r.fee); });
-                if(yTotal > 0) {
-                    moneyDailyHistory[last] = yTotal;
-                    localStorage.setItem('moneyDailyHistory', JSON.stringify(moneyDailyHistory));
-                }
-            }
-            localStorage.setItem('moneyLastUpdate', today);
-        }
+    function toggleOwnerDashboard() { if(prompt("Owner PIN:") === OWNER_PIN) document.getElementById('ownerPanel').style.display = 'block'; }
+    
+    // Lock Functionality (Syncs with Firebase to keep status across devices)
+    async function setLock(isLocked) {
+        document.getElementById('lockOverlay').style.display = isLocked ? 'flex' : 'none';
+        localStorage.setItem('posLocked', isLocked);
+    }
+    
+    if(localStorage.getItem('posLocked') === 'true') setLock(true);
 
-        // ================== DIAMOND RECORD SYSTEM (index.html logic) ==================
-        const diaPackages = [
-            { name: "2X 50+50", sc: 39 }, { name: "2X 150+150", sc: 116.9 }, { name: "2X 250+250", sc: 187.5 }, { name: "2X 500+500", sc: 385 },
-            { name: "86 Dia", sc: 61.5 }, { name: "172 Dia", sc: 122 }, { name: "257 Dia", sc: 177.5 }, { name: "343 Dia", sc: 239 },
-            { name: "429 Dia", sc: 299.5 }, { name: "514 Dia", sc: 355 }, { name: "706 Dia", sc: 480 }, { name: "878 Dia", sc: 602 },
-            { name: "1050 Dia", sc: 724 }, { name: "2195 Dia", sc: 1453 }, { name: "Weekly Pass", sc: 76 }, { name: "Twilight Pass", sc: 402.5 }
-        ];
-        let diaSales = JSON.parse(localStorage.getItem('diaSales')) || [];
+    async function deleteRec(id) { if(prompt("Delete PIN:") === OWNER_PIN) await db.collection("sales").doc(id).delete(); }
 
-        function renderDiaPriceCards() {
-            const grid = document.getElementById('diaPriceGrid');
-            const rate = parseFloat(document.getElementById('scRate').value) || 0;
-            grid.innerHTML = '';
-            diaPackages.forEach(p => {
-                const cost = (p.sc * rate).toFixed(0);
-                const card = document.createElement('div');
-                card.className = `price-card p-4 text-center ${document.getElementById('selectedPkgName').value === p.name ? 'selected' : ''}`;
-                card.innerHTML = `<span class="block text-xs text-gray-400 uppercase">${p.name}</span><b class="block text-lg text-white my-1">${parseInt(cost).toLocaleString()} Ks</b><i class="text-[10px] text-cyan-400 bg-slate-900 px-2 py-1 rounded-full border border-slate-700">${p.sc} SC</i>`;
-                card.onclick = (e) => selectDiaPkg(p.name, cost, e);
-                grid.appendChild(card);
-            });
-        }
-
-        function selectDiaPkg(name, cost, e) {
-            document.querySelectorAll('.price-card').forEach(c => c.classList.remove('selected'));
-            e.currentTarget.classList.add('selected');
-            document.getElementById('selectedPkgName').value = name;
-            document.getElementById('diaBuyPrice').value = cost;
-            document.getElementById('diaPkgLabel').innerHTML = `📍 Selected: <span class="text-yellow-500">${name}</span>`;
-        }
-
-        function saveDiaRecord() {
-            const pkg = document.getElementById('selectedPkgName').value;
-            const sell = document.getElementById('diaSellPrice').value;
-            const name = document.getElementById('diaCustName').value;
-            const date = document.getElementById('diaSaleDate').value;
-            if(!pkg || !sell) return alert("Package နှင့် ရောင်းဈေးထည့်ပါ");
-
-            const record = {
-                id: Date.now(), date, name: name || "ဧည့်သည်", pkg,
-                buy: parseFloat(document.getElementById('diaBuyPrice').value),
-                sell: parseFloat(sell),
-                profit: parseFloat(sell) - parseFloat(document.getElementById('diaBuyPrice').value)
-            };
-            diaSales.unshift(record);
-            localStorage.setItem('diaSales', JSON.stringify(diaSales));
-            document.getElementById('diaSellPrice').value = '';
-            document.getElementById('diaCustName').value = '';
-            renderDiaTable();
-        }
-
-        function deleteDia(id) {
-            if(confirm('ဖျက်မှာလား?')) { diaSales = diaSales.filter(s => s.id !== id); localStorage.setItem('diaSales', JSON.stringify(diaSales)); renderDiaTable(); }
-        }
-
-        function renderDiaTable() {
-            const body = document.getElementById('diaTableBody');
-            const search = document.getElementById('diaSearch').value.toLowerCase();
-            const today = new Date().toISOString().split('T')[0];
-            let dProfit = 0, dSell = 0, overall = 0;
-            body.innerHTML = '';
-
-            diaSales.forEach(s => {
-                overall += s.profit;
-                if (s.date === today) { dProfit += s.profit; dSell += s.sell; }
-                if (s.name.toLowerCase().includes(search) || s.date.includes(search)) {
-                    body.innerHTML += `
-                        <tr class="border-b border-slate-700 hover:bg-slate-700/30 transition-all">
-                            <td class="p-4 text-xs text-gray-500">${s.date}</td>
-                            <td class="p-4 font-bold text-cyan-400">${s.name}</td>
-                            <td class="p-4 text-yellow-500 text-sm">${s.pkg}</td>
-                            <td class="p-4 text-right text-green-400 font-bold">+${s.profit.toLocaleString()}</td>
-                            <td class="p-4 text-center"><button onclick="deleteDia(${s.id})" class="text-red-500">✕</button></td>
-                        </tr>`;
-                }
-            });
-            document.getElementById('diaDailyProfit').innerText = dProfit.toLocaleString() + ' Ks';
-            document.getElementById('diaDailySell').innerText = dSell.toLocaleString() + ' Ks';
-            document.getElementById('diaOverallProfit').innerText = overall.toLocaleString() + ' Ks';
-        }
-
-        function exportDiaToExcel() {
-            const ws = XLSX.utils.json_to_sheet(diaSales);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Diamond Sales");
-            XLSX.writeFile(wb, `MLBB_Sales_${new Date().toLocaleDateString()}.xlsx`);
-        }
-
-        // ================== INITIALIZATION ==================
-        window.onload = () => {
-            switchTab('money'); // Start with Money Record
-            
-            // Init Money
-            checkMoneyReset();
-            renderMoneyTable();
-            setInterval(checkMoneyReset, 60000);
-
-            // Init Diamond
-            document.getElementById('diaSaleDate').value = new Date().toISOString().split('T')[0];
-            document.getElementById('scRate').addEventListener('input', () => {
-                localStorage.setItem('scRate', document.getElementById('scRate').value);
-                renderDiaPriceCards();
-            });
-            const savedRate = localStorage.getItem('scRate');
-            if(savedRate) document.getElementById('scRate').value = savedRate;
-            renderDiaPriceCards();
-            renderDiaTable();
-        };
-    </script>
+    loadSales();
+</script>
 </body>
 </html>
